@@ -197,6 +197,7 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
       tabBar={(props: any) => <CustomTabBar {...props} />}
     >
+      
       <Tabs.Screen name="index"  />
       <Tabs.Screen name="projects" />
       <Tabs.Screen name="inbox" />

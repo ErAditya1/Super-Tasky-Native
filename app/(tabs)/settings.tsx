@@ -17,6 +17,8 @@ import { useAuth } from "@/context/AuthContext";
 import { router, useRouter } from "expo-router";
 import { theme } from "@/constants/Colors";
 import { useThemeToggle } from "@/context/ThemeContext";
+import { logout } from "@/lib/api/auth";
+import { clearAllAuthData } from "@/lib/api";
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -32,10 +34,18 @@ function SettingsContent({ onBack, isDark, onToggleTheme }: SettingsScreenProps)
   const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: () => {
+      { text: "Sign Out", style: "destructive", onPress: async() => {
         // Implement sign-out logic here
-        setIsLoggedIn(false);
-        router.replace("/(auth)/Login");
+
+        const res =await logout()
+        if(res.success){
+            setIsLoggedIn(false);
+            router.replace("/(auth)/Login");
+            await clearAllAuthData()
+        }
+
+
+      
 
 
       }},

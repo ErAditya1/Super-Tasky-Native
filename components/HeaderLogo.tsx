@@ -17,7 +17,7 @@ const HeaderLogo = () => {
       }}
     >
       <Image
-        source={require("@/assets/image/icon.png")}
+        source={require("@/assets/images/icon.png")}
         style={{
           width: 50,
           height: 50,

@@ -166,7 +166,7 @@ export default function AboutScreen() {
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <View style={[styles.logoWrap, { width: logoSize, height: logoSize, borderRadius: Math.round(logoSize / 8) }]}>
               <Image
-                source={require("../../../assets/image/detailed_logo.jpg")}
+                source={require("../../../assets/images/detailed_logo.jpg")}
                 style={{ width: "100%", height: "100%", borderRadius: Math.round(logoSize / 8) }}
                 resizeMode="cover"
               />

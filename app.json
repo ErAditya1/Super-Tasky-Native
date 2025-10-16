@@ -1,21 +1,23 @@
 {
   "expo": {
     "name": "Super Tasky",
-    "slug": "Super Tasky",
-    
+    "slug": "super-tasky",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/image/detailed_logo.jpg",
+    "icon": "./assets/images/detailed_logo.jpg",
     "scheme": "supertasky",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["assets/fonts/*", "assets/images/*"],
+    "assetBundlePatterns": [
+      "assets/fonts/*",
+      "assets/images/*"
+    ],
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
-     "android": {
+    "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/image/detailed_logo.jpg",
+        "foregroundImage": "./assets/images/detailed_logo.jpg",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -24,7 +26,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/image/icon.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
@@ -44,6 +46,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "eb4d0416-ecab-42c0-b791-d9acdb8545af"
+      }
+    },
+    "owner": "eraditya1"
   }
 }

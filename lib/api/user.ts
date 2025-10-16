@@ -1,6 +1,7 @@
 import api from "../api"
 import { withHandler } from "../withhandler"
 
+export const getCurrentUser = async ()=> withHandler(()=> api.get("/api/v1/users/current-user"))
 export const getProfileByUsername = async(username:any)=> withHandler(()=> api.get(`/api/v1/users/get-user-profile/${username}`))
 export const getUserAccount = async()=> withHandler(()=> api.get(`/api/v1/users/get-user-account`))
 

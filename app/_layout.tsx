@@ -6,7 +6,7 @@ import {
   Theme as NavigationTheme,
   ThemeProvider as NavigationThemeProvider,
 } from "@react-navigation/native";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
@@ -16,6 +16,11 @@ import { View, StyleSheet } from "react-native";
 import { theme } from "@/constants/Colors";
 import { ThemeProviderCustom, useThemeToggle } from "@/context/ThemeContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/RouteGuard";
+import RouteGuard from "@/components/RouteGuard";
+import {  ToastProvider } from "@/components/Toast";
+import { Provider } from "react-redux";
+import { store } from "@/store/store";
 
 type NativeStackSafeTheme = NavigationTheme & {
   fonts: {
@@ -48,11 +53,17 @@ function mapToNavigationTheme(custom: any): NativeStackSafeTheme {
 export default function RootLayout() {
   return (
     <AuthProvider>
+      <Provider store={store}>
       <ThemeProviderCustom>
         <SafeAreaProvider>
-          <InnerLayout />
+          <RouteGuard>
+            <ToastProvider>
+            <InnerLayout />
+            </ToastProvider>
+          </RouteGuard>
         </SafeAreaProvider>
       </ThemeProviderCustom>
+      </Provider>
     </AuthProvider>
   );
 }
@@ -65,6 +76,7 @@ function InnerLayout() {
   const { isLoggedIn } = useAuth();
   const currentTheme = theme[isDark ? "dark" : "light"];
   const navigationTheme = mapToNavigationTheme(currentTheme);
+  // console.log(isLoggedIn);
 
   return (
     <NavigationThemeProvider value={navigationTheme}>
@@ -74,6 +86,7 @@ function InnerLayout() {
       >
         <Stack
           screenOptions={{
+            headerShown: false,
             headerStyle: { backgroundColor: currentTheme.card },
             headerTintColor: currentTheme.cardForeground,
             headerTitleStyle: {
@@ -83,13 +96,14 @@ function InnerLayout() {
             contentStyle: { backgroundColor: currentTheme.background },
           }}
         >
-          {isLoggedIn ? (
-          
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-             
-          ) : (
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          )}
+          {/* Public Routes */}
+
+          {/* Protected Routes */}
+
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
+          {/* Not Found */}
           <Stack.Screen name="+not-found" options={{ title: "Not Found" }} />
         </Stack>
 
@@ -103,8 +117,3 @@ function InnerLayout() {
     </NavigationThemeProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  container: { flex: 1 },
-});

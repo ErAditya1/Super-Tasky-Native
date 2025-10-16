@@ -1,5 +1,5 @@
 // app/(auth)/ForgotPassword.tsx
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
 import { useRouter } from "expo-router";
 import { useThemeToggle } from "@/context/ThemeContext";
 import { theme } from "@/constants/Colors";
+import { useToast } from "@/components/Toast";
+import { requestPasswordReset } from "@/lib/api/auth";
 
 const { width } = Dimensions.get("window");
 
@@ -22,6 +24,8 @@ export default function ForgotPasswordScreen() {
   const currentTheme = theme[isDark ? "dark" : "light"];
 
   const [email, setEmail] = React.useState("");
+  const toast = useToast()
+  const [loading, setLoading] = useState(false)
 
   // Animated logo
   const logoScale = useRef(new Animated.Value(0.8)).current;
@@ -34,12 +38,21 @@ export default function ForgotPasswordScreen() {
     }).start();
   }, []);
 
-  const onSubmit = () => {
+  const onSubmit = async() => {
     if (!email.trim()) {
       Alert.alert("Error", "Please enter a valid email");
       return;
     }
-    Alert.alert("Password Reset", `Reset link sent to ${email}`);
+    if(loading) return
+    setLoading(true)
+    const res = await requestPasswordReset(email)
+    console.log(res)
+    if(res.success){
+      toast.show(`Reset link sent to ${email}`,"success")
+    }else{
+      toast.show(res.message ||"reset failed","danger" )
+    }
+    setLoading(false)
   };
 
   return (
@@ -63,7 +76,7 @@ export default function ForgotPasswordScreen() {
           }}
         >
           <Animated.Image
-            source={require("../../assets/image/detailed_logo.jpg")}
+            source={require("../../assets/images/detailed_logo.jpg")}
             style={[styles.logo, { transform: [{ scale: logoScale }] }]}
             resizeMode="contain"
           />
@@ -112,7 +125,7 @@ export default function ForgotPasswordScreen() {
               fontSize: 16,
             }}
           >
-            Submit
+            {loading ? "Sending ..." : "Reset Password"}
           </Text>
         </TouchableOpacity>
 

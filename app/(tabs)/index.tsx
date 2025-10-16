@@ -14,6 +14,7 @@ import {
   ScrollView,
   Platform,
   StatusBar,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -25,6 +26,8 @@ import { useRouter } from "expo-router";
 
 import { theme } from "@/constants/Colors";
 import { useThemeToggle } from "@/context/ThemeContext";
+import { useAppSelector } from "@/store/hooks";
+import { Image } from "expo-image";
 
 type Priority = "low" | "medium" | "high";
 type User = { id: string; name: string; initials: string };
@@ -99,6 +102,9 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 const TABS = ["Today", "Upcoming", "All Tasks", "Completed"] as const;
 type TabName = (typeof TABS)[number];
 
+const WINDOW = Dimensions.get("window");
+const HEADER_HEIGHT = 112; // header area height (including search) — used for layout
+
 export default function HomeDashboard() {
   const { isDark } = useThemeToggle();
   const currentTheme = theme[isDark ? "dark" : "light"];
@@ -121,6 +127,8 @@ export default function HomeDashboard() {
     []
   );
 
+  const { team } = useAppSelector((state) => state.team);
+
   const usersById = useMemo(
     () => Object.fromEntries(SAMPLE_USERS.map((u) => [u.id, u])),
     []
@@ -136,15 +144,16 @@ export default function HomeDashboard() {
 
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Animated values used for header translate / scale on scroll
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, 80],
-    outputRange: [0, -60],
+    outputRange: [0, -40], // slightly move up on scroll
     extrapolate: "clamp",
   });
   const headerScale = scrollY.interpolate({
     inputRange: [0, 80],
-    outputRange: [1, 0.96],
+    outputRange: [1, 0.99],
     extrapolate: "clamp",
   });
   const fabScale = useRef(new Animated.Value(1)).current;
@@ -154,7 +163,7 @@ export default function HomeDashboard() {
     Animated.timing(bottomSheetAnim, {
       toValue: teamModalOpen ? 1 : 0,
       duration: 280,
-      useNativeDriver: Platform.OS === "ios", // safer fallback
+      useNativeDriver: false,
     }).start();
   }, [teamModalOpen, bottomSheetAnim]);
 
@@ -208,6 +217,23 @@ export default function HomeDashboard() {
     searchQuery,
   ]);
 
+  // Build a mixed-data array so we can use stickyHeaderIndices on the FlatList.
+  // Items:
+  //  - index 0 => Projects row (sticky)
+  //  - index 1 => Filter row (sticky)
+  //  - index 2 => Tabs row (sticky)
+  //  - index >=3 => tasks
+  const listData = useMemo(() => {
+    const arr: Array<any> = [
+      { __type: "projects" },
+      { __type: "filters" },
+      { __type: "tabs" },
+      // then tasks
+      ...filteredTasks.map((t) => ({ __type: "task", task: t })),
+    ];
+    return arr;
+  }, [filteredTasks]);
+
   function markComplete(taskId: string) {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t))
@@ -251,6 +277,26 @@ export default function HomeDashboard() {
     );
   }
 
+  // --- Swipeable management ---
+  // store refs to each swipeable by task id
+  const swipeableRefs = useRef<Record<string, any>>({});
+  // store currently open swipeable
+  const openSwipeableRef = useRef<any>(null);
+
+  function closeOpenSwipeable() {
+    if (
+      openSwipeableRef.current &&
+      typeof openSwipeableRef.current.close === "function"
+    ) {
+      try {
+        openSwipeableRef.current.close();
+      } catch {
+        // ignore any errors closing
+      }
+      openSwipeableRef.current = null;
+    }
+  }
+
   const renderRightActions = (task: Task) => (
     <Pressable
       onPress={() => onEditTask(task.id)}
@@ -274,6 +320,10 @@ export default function HomeDashboard() {
       onPress={() => {
         if (task.completed) undoComplete(task.id);
         else markComplete(task.id);
+        // after action, close the swipe
+        if (swipeableRefs.current[task.id]?.close)
+          swipeableRefs.current[task.id].close();
+        openSwipeableRef.current = null;
       }}
       style={[styles.swipeAction, { backgroundColor: currentTheme.secondary }]}
     >
@@ -290,191 +340,391 @@ export default function HomeDashboard() {
     </Pressable>
   );
 
-  const renderTask = ({ item }: { item: Task }) => {
-    const assignee = item.assignee
-      ? (usersById[item.assignee] as User)
+  const renderTaskCard = (task: Task) => {
+    const assignee = task.assignee
+      ? (usersById[task.assignee] as User)
       : undefined;
-    const project = item.projectId
-      ? (projectsById[item.projectId] as Project)
+    const project = task.projectId
+      ? (projectsById[task.projectId] as Project)
       : undefined;
 
     return (
       <GestureHandlerRootView>
         <Swipeable
-          renderLeftActions={() => renderLeftActions(item)}
-          renderRightActions={() => renderRightActions(item)}
+          ref={(r) => {
+            swipeableRefs.current[task.id] = r;
+          }}
+          renderLeftActions={() => renderLeftActions(task)}
+          renderRightActions={() => renderRightActions(task)}
           overshootLeft={false}
           overshootRight={false}
+          onSwipeableOpen={() => {
+            // close previous if different
+            const prev = openSwipeableRef.current;
+            const current = swipeableRefs.current[task.id];
+            if (prev && prev !== current && typeof prev.close === "function") {
+              try {
+                prev.close();
+              } catch {}
+            }
+            openSwipeableRef.current = current;
+          }}
+          onSwipeableClose={() => {
+            const current = swipeableRefs.current[task.id];
+            if (openSwipeableRef.current === current)
+              openSwipeableRef.current = null;
+          }}
         >
-          <View
-            style={[
-              styles.taskCard,
-              {
-                backgroundColor: currentTheme.card,
-                borderColor: currentTheme.border,
-                shadowColor: isDark ? "#000" : "#000",
-              },
-            ]}
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+              // If another row is open, first tap closes it.
+              const open = openSwipeableRef.current;
+              const thisRef = swipeableRefs.current[task.id];
+              if (open && open !== thisRef) {
+                closeOpenSwipeable();
+                return;
+              }
+              // otherwise, handle tap (navigate/edit/etc) if you want
+              // e.g. router.push(`/tasks/${task.id}`)
+            }}
           >
-            <View style={styles.taskLeft}>
-              <View
-                style={[
-                  styles.priorityDot,
-                  {
-                    backgroundColor: PRIORITY_COLORS[item.priority],
-                    shadowColor: PRIORITY_COLORS[item.priority],
-                  },
-                ]}
-                accessibilityLabel={`Priority ${item.priority}`}
-              />
-            </View>
-
-            <View style={styles.taskBody}>
-              <View style={styles.row}>
-                <Text
+            <View
+              style={[
+                styles.taskCard,
+                {
+                  backgroundColor: currentTheme.card,
+                  borderColor: currentTheme.border,
+                  shadowColor: isDark ? "#000" : "#000",
+                },
+              ]}
+            >
+              <View style={styles.taskLeft}>
+                <View
                   style={[
-                    styles.taskTitle,
-                    { color: currentTheme.cardForeground },
+                    styles.priorityDot,
+                    {
+                      backgroundColor: PRIORITY_COLORS[task.priority],
+                      shadowColor: PRIORITY_COLORS[task.priority],
+                    },
                   ]}
-                  numberOfLines={1}
-                  accessibilityRole="header"
-                >
-                  {item.title}
-                </Text>
-                {project && (
-                  <View
-                    style={[
-                      styles.projectChip,
-                      { backgroundColor: adjustAlpha(project.color, 0.12) },
-                    ]}
-                  >
-                    <Text style={{ color: project.color, fontWeight: "600" }}>
-                      {project.title}
-                    </Text>
-                  </View>
-                )}
+                  accessibilityLabel={`Priority ${task.priority}`}
+                />
               </View>
 
-              <View
-                style={[styles.row, { marginTop: 8, alignItems: "center" }]}
-              >
-                <Text
-                  style={[
-                    styles.metaText,
-                    { color: currentTheme.mutedForeground },
-                  ]}
-                >
-                  {item.dueDate
-                    ? `Due ${formatDate(item.dueDate)}`
-                    : "No due date"}
-                </Text>
-
-                <View style={{ width: 12 }} />
-
-                {assignee ? (
-                  <View
+              <View style={styles.taskBody}>
+                <View style={styles.row}>
+                  <Text
                     style={[
-                      styles.avatar,
-                      {
-                        backgroundColor: currentTheme.sidebarAccent,
-                        borderWidth: 0,
-                      },
+                      styles.taskTitle,
+                      { color: currentTheme.cardForeground },
                     ]}
-                    accessibilityLabel={`Assigned to ${assignee.name}`}
+                    numberOfLines={1}
+                    accessibilityRole="header"
                   >
-                    <Text
-                      style={{
-                        color: currentTheme.sidebarAccentForeground,
-                        fontWeight: "700",
-                      }}
+                    {task.title}
+                  </Text>
+                  {project && (
+                    <View
+                      style={[
+                        styles.projectChip,
+                        { backgroundColor: adjustAlpha(project.color, 0.12) },
+                      ]}
                     >
-                      {assignee.initials}
-                    </Text>
-                  </View>
-                ) : null}
+                      <Text style={{ color: project.color, fontWeight: "600" }}>
+                        {project.title}
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
-                <View style={{ flex: 1 }} />
+                <View
+                  style={[styles.row, { marginTop: 8, alignItems: "center" }]}
+                >
+                  <Text
+                    style={[
+                      styles.metaText,
+                      { color: currentTheme.mutedForeground },
+                    ]}
+                  >
+                    {task.dueDate
+                      ? `Due ${formatDate(task.dueDate)}`
+                      : "No due date"}
+                  </Text>
 
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  {item.tags?.map((tagId) => {
-                    const tag = tagsById[tagId];
-                    return (
-                      <View
-                        key={tagId}
-                        style={[
-                          styles.tagChip,
-                          { borderColor: currentTheme.border },
-                        ]}
+                  <View style={{ width: 12 }} />
+
+                  {assignee ? (
+                    <View
+                      style={[
+                        styles.avatar,
+                        {
+                          backgroundColor: currentTheme.sidebarAccent,
+                          borderWidth: 0,
+                        },
+                      ]}
+                      accessibilityLabel={`Assigned to ${assignee.name}`}
+                    >
+                      <Text
+                        style={{
+                          color: currentTheme.sidebarAccentForeground,
+                          fontWeight: "700",
+                        }}
                       >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            color: currentTheme.cardForeground,
-                          }}
+                        {assignee.initials}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={{ flex: 1 }} />
+
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    {task.tags?.map((tagId) => {
+                      const tag = tagsById[tagId];
+                      return (
+                        <View
+                          key={tagId}
+                          style={[
+                            styles.tagChip,
+                            { borderColor: currentTheme.border },
+                          ]}
                         >
-                          {tag?.title}
-                        </Text>
-                      </View>
-                    );
-                  })}
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: currentTheme.cardForeground,
+                            }}
+                          >
+                            {tag?.title}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         </Swipeable>
       </GestureHandlerRootView>
     );
   };
 
-  const ProjectCard = ({ item }: { item: Project }) => (
-    <TouchableOpacity
-      onPress={() => router.push(`/(routes)/projects/${item.id}`)}
+  // --- Components that are used as items in the list so we can make them sticky ---
+  const ProjectsRow = () => (
+    <View
       style={[
-        styles.projectCard,
-        { backgroundColor: item.color, shadowColor: item.color },
+        styles.projectsContainer,
+        { backgroundColor: currentTheme.background },
       ]}
-      accessibilityRole="button"
     >
-      <Text style={styles.projectTitle} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <View
-        style={{ flexDirection: "row", marginTop: 10, alignItems: "center" }}
-      >
-        {SAMPLE_USERS.slice(0, 3).map((u) => (
-          <View key={u.id} style={styles.projectAvatar}>
-            <Text style={{ color: "#fff", fontWeight: "700" }}>
-              {u.initials}
-            </Text>
-          </View>
-        ))}
-      </View>
-      <View style={{ marginTop: 12 }}>
-        <View style={styles.progressBarBackground}>
-          <View
+      <FlatList
+        data={SAMPLE_PROJECTS}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(p) => p.id}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8 }}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            onPress={() => router.push(`/(routes)/projects/${item.id}`)}
             style={[
-              styles.progressBarFill,
-              { width: `${(item.progress ?? 0) * 100}%` },
+              styles.projectCard,
+              { backgroundColor: item.color, shadowColor: item.color },
             ]}
-          />
-        </View>
-      </View>
-    </TouchableOpacity>
+            accessibilityRole="button"
+          >
+            <Text style={styles.projectTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                marginTop: 10,
+                alignItems: "center",
+              }}
+            >
+              {SAMPLE_USERS.slice(0, 3).map((u) => (
+                <View key={u.id} style={styles.projectAvatar}>
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>
+                    {u.initials}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <View style={{ marginTop: 12 }}>
+              <View style={styles.progressBarBackground}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${(item.progress ?? 0) * 100}%` },
+                  ]}
+                />
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+        ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+      />
+    </View>
   );
 
-  const bottomTranslateY = bottomSheetAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [400, 0],
-  });
+  const FiltersRow = () => (
+    <View
+      style={[
+        styles.filterRow,
+        {
+          backgroundColor: currentTheme.background,
+          borderBottomColor: currentTheme.border,
+        },
+      ]}
+    >
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 12 }}
+      >
+        {SAMPLE_TAGS.map((t) => {
+          const active = activeTagFilters.includes(t.id);
+          return (
+            <TouchableOpacity
+              key={t.id}
+              onPress={() => toggleTagFilter(t.id)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active
+                    ? currentTheme.primary
+                    : currentTheme.muted,
+                  borderColor: currentTheme.border,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: active
+                    ? currentTheme.primaryForeground
+                    : currentTheme.mutedForeground,
+                }}
+              >
+                {t.title}{" "}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+        {SAMPLE_PROJECTS.map((p) => {
+          const active = activeProjectFilters.includes(p.id);
+          return (
+            <TouchableOpacity
+              key={p.id}
+              onPress={() => toggleProjectFilter(p.id)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active ? p.color : currentTheme.muted,
+                  borderColor: currentTheme.border,
+                  marginLeft: 8,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: active ? "#fff" : currentTheme.mutedForeground,
+                }}
+              >
+                {p.title}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+        {SAMPLE_USERS.map((u) => {
+          const active = activeAssigneeFilters.includes(u.id);
+          return (
+            <TouchableOpacity
+              key={u.id}
+              onPress={() => toggleAssigneeFilter(u.id)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active
+                    ? currentTheme.primary
+                    : currentTheme.muted,
+                  marginLeft: 8,
+                  borderColor: currentTheme.border,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: active
+                    ? currentTheme.primaryForeground
+                    : currentTheme.mutedForeground,
+                }}
+              >
+                {u.initials}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
 
+  const TabsRow = () => (
+    <View
+      style={[
+        styles.tabs,
+        {
+          borderBottomColor: currentTheme.border,
+          backgroundColor: currentTheme.background,
+        },
+      ]}
+    >
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 12 }}
+      >
+        {TABS.map((t) => {
+          const active = t === selectedTab;
+          return (
+            <TouchableOpacity
+              key={t}
+              onPress={() => setSelectedTab(t)}
+              style={[
+                styles.tabButton,
+                active && {
+                  borderBottomColor: currentTheme.primary,
+                  borderBottomWidth: 2,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: active
+                    ? currentTheme.primary
+                    : currentTheme.mutedForeground,
+                  fontWeight: active ? "700" : "500",
+                }}
+              >
+                {t}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  // Header is absolute at top and animated — stays visible (sticky) while the list scrolls underneath.
   const Header = () => (
     <Animated.View
       style={[
         styles.header,
         {
+          paddingTop: 0,
           transform: [{ translateY: headerTranslateY }, { scale: headerScale }],
-          // backgroundColor: currentTheme.card,
           borderBottomColor: currentTheme.border,
+          backgroundColor: currentTheme.background,
         },
       ]}
     >
@@ -483,26 +733,34 @@ export default function HomeDashboard() {
           onPress={() => setTeamModalOpen(true)}
           style={styles.teamContainer}
         >
-          <View
-            style={[
-              styles.teamIcon,
-              { backgroundColor: currentTheme.sidebarAccent },
-            ]}
-          >
-            <Ionicons
-              name="people"
-              size={16}
-              color={currentTheme.sidebarAccentForeground}
-            />
-          </View>
+          {team?.avatar ? (
+            // <Image source={{uri:}} alt={team?.name}/>
+            <Image
+                              source={{ uri: team.avatar?.url }}
+                              style={{ width: 35, height: 35, borderRadius: 20 / 6 }}
+                            />
+          ) : (
+            <View
+              style={[
+                styles.teamIcon,
+                { backgroundColor: currentTheme.sidebarAccent },
+              ]}
+            >
+              <Ionicons
+                name="people"
+                size={16}
+                color={currentTheme.sidebarAccentForeground}
+              />
+            </View>
+          )}
           <View style={{ marginLeft: 10 }}>
             <Text
               style={{ color: currentTheme.cardForeground, fontWeight: "700" }}
             >
-              {currentTeam.name}
+              {team?.name}
             </Text>
             <Text style={{ color: currentTheme.mutedForeground, fontSize: 12 }}>
-              3 members • 2 projects
+              {team?.members?.length} members • {team?.projects?.length} projects {" "}
             </Text>
           </View>
           <Ionicons
@@ -560,7 +818,12 @@ export default function HomeDashboard() {
         </View>
       </View>
 
-      <View style={[styles.searchRow, { backgroundColor: currentTheme.card }]}>
+      <View
+        style={[
+          styles.searchRow,
+          { backgroundColor: currentTheme.card, marginTop: 10 },
+        ]}
+      >
         <Ionicons
           name="search"
           size={18}
@@ -587,177 +850,69 @@ export default function HomeDashboard() {
     </Animated.View>
   );
 
+  // Render mixed list items (projects, filters, tabs, tasks)
+  const renderMixedItem = ({ item, index }: { item: any; index: number }) => {
+    if (item.__type === "projects") {
+      return <ProjectsRow />;
+    }
+    if (item.__type === "filters") {
+      return <FiltersRow />;
+    }
+    if (item.__type === "tabs") {
+      return <TabsRow />;
+    }
+    if (item.__type === "task") {
+      return renderTaskCard(item.task);
+    }
+    return null;
+  };
+
   return (
-    <View style={[styles.screen, { backgroundColor: currentTheme.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-
-      <Header />
-
-      <View style={{ marginTop: 10 }}>
-        <FlatList
-          data={SAMPLE_PROJECTS}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(p) => p.id}
-          contentContainerStyle={{ paddingHorizontal: 12 }}
-          renderItem={({ item }) => <ProjectCard item={item} />}
-          ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-        />
-      </View>
-
-      <View
-        style={[styles.filterRow, { backgroundColor: currentTheme.background }]}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 12 }}
-        >
-          {SAMPLE_TAGS.map((t) => {
-            const active = activeTagFilters.includes(t.id);
-            return (
-              <TouchableOpacity
-                key={t.id}
-                onPress={() => toggleTagFilter(t.id)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: active
-                      ? currentTheme.primary
-                      : currentTheme.muted,
-                    borderColor: currentTheme.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: active
-                      ? currentTheme.primaryForeground
-                      : currentTheme.mutedForeground,
-                  }}
-                >
-                  {t.title}{" "}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-          {SAMPLE_PROJECTS.map((p) => {
-            const active = activeProjectFilters.includes(p.id);
-            return (
-              <TouchableOpacity
-                key={p.id}
-                onPress={() => toggleProjectFilter(p.id)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: active ? p.color : currentTheme.muted,
-                    borderColor: currentTheme.border,
-                    marginLeft: 8,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: active ? "#fff" : currentTheme.mutedForeground,
-                  }}
-                >
-                  {p.title}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-          {SAMPLE_USERS.map((u) => {
-            const active = activeAssigneeFilters.includes(u.id);
-            return (
-              <TouchableOpacity
-                key={u.id}
-                onPress={() => toggleAssigneeFilter(u.id)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: active
-                      ? currentTheme.primary
-                      : currentTheme.muted,
-                    marginLeft: 8,
-                    borderColor: currentTheme.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: active
-                      ? currentTheme.primaryForeground
-                      : currentTheme.mutedForeground,
-                  }}
-                >
-                  {u.initials}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      <View
-        style={[
-          styles.tabs,
-          {
-            borderBottomColor: currentTheme.border,
-            backgroundColor: currentTheme.background,
-          },
-        ]}
-      >
-        {TABS.map((t) => {
-          const active = t === selectedTab;
-          return (
-            <TouchableOpacity
-              key={t}
-              onPress={() => setSelectedTab(t)}
-              style={[
-                styles.tabButton,
-                active && {
-                  borderBottomColor: currentTheme.primary,
-                  borderBottomWidth: 2,
-                },
-              ]}
-            >
-              <Text
-                style={{
-                  color: active
-                    ? currentTheme.primary
-                    : currentTheme.mutedForeground,
-                  fontWeight: active ? "700" : "500",
-                }}
-              >
-                {t}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <Animated.FlatList
-        data={filteredTasks}
-        keyExtractor={(t) => t.id}
-        renderItem={renderTask}
-        contentContainerStyle={{
-          padding: 12,
-          paddingBottom: insets.bottom + 120,
-        }}
-        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
-        ListEmptyComponent={() => (
-          <View style={{ padding: 24, alignItems: "center" }}>
-            <Text style={{ color: currentTheme.mutedForeground }}>
-              No tasks match your filters.
-            </Text>
-          </View>
-        )}
+    <View
+      style={[styles.screen, { backgroundColor: currentTheme.background }]}
+      onStartShouldSetResponder={() => {
+        // close open swipeable when tapping anywhere outside
+        closeOpenSwipeable();
+        return false;
+      }}
+    >
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={currentTheme.background}
       />
 
+      {/* Animated, absolute header on top so it's visually sticky — the list scrolls underneath */}
+      <Header />
+
+      {/* Animated FlatList with stickyHeaderIndices pointing to the three rows we want pinned under the header */}
+      <Animated.FlatList
+        data={listData}
+        renderItem={renderMixedItem}
+        keyExtractor={(item, i) =>
+          item.__type === "task" ? item.task.id : `${item.__type}-${i}`
+        }
+        contentContainerStyle={{
+          paddingTop: HEADER_HEIGHT + 12, // push content below the absolute header
+          paddingBottom: insets.bottom + 120,
+          minHeight: WINDOW.height + 1,
+        }}
+        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+        stickyHeaderIndices={[0, 1, 2]} // ProjectsRow, FiltersRow, TabsRow will stick
+        // Use native driver animation for smooth scroll-linked header animation
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }] as any,
+          { useNativeDriver: true }
+        )}
+        onScrollBeginDrag={() => {
+          // close any open swipeable when user starts scrolling
+          closeOpenSwipeable();
+        }}
+        scrollEventThrottle={16}
+        // Improve swipeable performance inside FlatList
+        removeClippedSubviews
+      />
+
+      {/* Floating action button */}
       <Animated.View
         style={{
           position: "absolute",
@@ -788,6 +943,7 @@ export default function HomeDashboard() {
         </TouchableOpacity>
       </Animated.View>
 
+      {/* Team modal */}
       <Modal
         visible={teamModalOpen}
         transparent
@@ -804,7 +960,6 @@ export default function HomeDashboard() {
               {
                 backgroundColor: currentTheme.card,
                 borderColor: currentTheme.border,
-                transform: [{ translateY: bottomTranslateY }],
               },
             ]}
           >
@@ -848,7 +1003,6 @@ export default function HomeDashboard() {
                     onPress={() => {
                       setCurrentTeam({ id: name, name });
                       setTeamModalOpen(false);
-                      // Optionally navigate to team page
                     }}
                     style={styles.modalRow}
                   >
@@ -917,21 +1071,19 @@ function formatDate(d?: string) {
       day: "numeric",
     });
   } catch {
-    return d;
+    return d || "";
   }
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
 
-  animatedHeader: {
-    zIndex: 10,
-  },
-
   header: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 50,
     paddingHorizontal: 16,
-    // We'll add top padding via insets in parent maybe
-    paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
@@ -989,7 +1141,6 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.05)",
     borderRadius: 12,
     marginTop: 10,
     paddingHorizontal: 12,
@@ -1009,6 +1160,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 
+  projectsContainer: {
+    borderBottomWidth: 0.5,
+  },
   projectCard: {
     width: 220,
     padding: 16,
@@ -1018,6 +1172,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 6 },
     overflow: "hidden",
+    marginVertical: 8,
   },
   projectTitle: {
     color: "#fff",
@@ -1046,7 +1201,7 @@ const styles = StyleSheet.create({
 
   filterRow: {
     borderBottomWidth: 0.5,
-    marginBottom: 6,
+    paddingVertical: 8,
   },
   chip: {
     paddingVertical: 6,
@@ -1076,6 +1231,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
+    marginHorizontal: 12,
   },
   taskLeft: { width: 14, alignItems: "center", marginRight: 12 },
   priorityDot: { width: 12, height: 12, borderRadius: 6, marginTop: 6 },

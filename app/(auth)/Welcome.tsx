@@ -38,7 +38,7 @@ export default function WelcomeScreen() {
       <View style={[styles.circle, { bottom: -60, right: -60, backgroundColor: "#B0FFDC33" }]} />
 
       <Animated.Image
-        source={require("../../assets/image/detailed_logo.jpg")}
+        source={require("../../assets/images/detailed_logo.jpg")}
         style={[styles.logo, { transform: [{ scale: scaleAnim }] }]}
         resizeMode="contain"
       />

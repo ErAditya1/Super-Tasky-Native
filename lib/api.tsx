@@ -8,29 +8,15 @@ import { logout } from "./api/auth";
 // --------- Config / API URL for Expo dev environments ----------
 const PROD_URL = "https://super-tasky-server.onrender.com";
 
-// Derive a sensible dev URL for Expo. If running in Expo Go, manifest.debuggerHost gives "host:port"
-function getDefaultDevUrl(): string {
-  try {
-    const dbg = (Constants.manifest as any)?.debuggerHost;
-    if (dbg) {
-      const host = String(dbg).split(":")[0];
-      return `http://${host}:8000`;
-    }
-  } catch (e) {
-    // ignore
-  }
-  // emulator fallback
-  if (Platform.OS === "android") return "http://10.0.2.2:8000";
-  return "http://localhost:8000";
-}
 
 export const API_URL =
-  process.env.NODE_ENV === "production" ? PROD_URL : getDefaultDevUrl();
+  process.env.NODE_ENV !== "production" ? PROD_URL : 'http://localhost:8000';
+  console.log(API_URL)
 
 // --------- Secure storage keys & utilities ----------
-const KEY_ACCESS = "st_access_token_v1";
-const KEY_REFRESH = "st_refresh_token_v1";
-const KEY_DEVICE = "st_device_id_v1";
+export const KEY_ACCESS = "st_access_token_v1";
+export const KEY_REFRESH = "st_refresh_token_v1";
+export const KEY_DEVICE = "st_device_id_v1";
 
 async function generateUuid(): Promise<string> {
   // simple UUIDv4 generator (no extra deps)
