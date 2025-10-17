@@ -2,10 +2,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import * as SecureStore from "expo-secure-store";
 import { getCurrentUser } from "@/lib/api/user";
+import { useAppDispatch } from "@/store/hooks";
+import { loginUser } from "@/store/user/userSlice";
 
 interface AuthContextType {
   isLoggedIn: boolean;
   setIsLoggedIn: (val: boolean) => void;
+  setGlobalLoading: (val: boolean)=> void
   user: any;
   loading: boolean;
   refreshUser: () => Promise<void>;
@@ -16,14 +19,15 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setGlobalLoading] = useState(true);
+  const dispatch = useAppDispatch()
 
   const refreshUser = async () => {
     try {
-      setLoading(true);
+      setGlobalLoading(true);
       const res = await getCurrentUser();
       if (res.success) {
-        
+        dispatch(loginUser(res.data.data.user));
         setUser(res.data.data.user);
         console.log(res.data.data.user.username)
         setIsLoggedIn(true);
@@ -36,7 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       setIsLoggedIn(false);
     } finally {
-      setLoading(false);
+      setGlobalLoading(false);
     }
   };
 
@@ -45,7 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn, user, loading, refreshUser }}>
+    <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn, user, loading, refreshUser , setGlobalLoading}}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { add } from "date-fns";
+import { ProjectInterface } from "../project2/projectSlice";
+import { User, UserInterface } from "../user/userSlice";
+
 
 
 //  points:{
@@ -37,8 +39,19 @@ export interface TaskInterface {
     points: string,
     type: "Task" | "Feature" | "Improvement" | "Research" | "Testing" | "Bug";
     lastSeen:string,
-    project: string | null,
-    assignedToUser: string | null,
+    project: {
+        _id:string
+        name:string
+        color:string
+,
+    },
+    assignedToUser: {
+        _id:string,
+        name:string,
+        avatar: {
+            url:string
+        }
+    } ,
     assignedToTeam: string | null,
     dueDate: Date | null | string,
     tags: string[],
@@ -73,8 +86,19 @@ const task: TaskInterface | null = {
     points: '',
     type: 'Task',
     lastSeen :"",
-    project: null,
-    assignedToUser: null,
+    project: {
+        _id:"",
+        name:"",
+        color:"",
+
+    },
+    assignedToUser: {
+        _id:"",
+        name:"",
+        avatar:{
+            url:"",
+        }
+    },
     assignedToTeam: null,
     dueDate: null,
     tags: [],

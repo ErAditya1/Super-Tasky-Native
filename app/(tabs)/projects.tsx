@@ -19,6 +19,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { theme } from "@/constants/Colors";
 import { useThemeToggle } from "@/context/ThemeContext";
+import { useAppSelector } from "@/store/hooks";
+import Avatar from "@/components/Avatar";
 
 type Project = {
   id: string;
@@ -54,10 +56,12 @@ export default function ProjectsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [projects, setProjects] = useState(SAMPLE_PROJECTS);
+  
   const [modalVisible, setModalVisible] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newColor, setNewColor] = useState("#6750A4");
+
+  const {projects} = useAppSelector(state=> state.project)
 
   const createProject = () => {
     if (!newTitle.trim()) {
@@ -71,10 +75,17 @@ export default function ProjectsScreen() {
       progress: 0,
       members: [],
     };
-    setProjects((prev) => [newProject, ...prev]);
+    // setProjects((prev) => [newProject, ...prev]);
+    // dispatch project
     setModalVisible(false);
     setNewTitle("");
   };
+  function calculateProjectProgress(project: any) {
+  const totalTasks = project?.tasks?.length ?? 0;
+  const completedTasks = project?.tasks?.filter((t: any) => t.status === "completed" || t.status === "canceled").length ?? 0;
+  const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+  return { progress, totalTasks, completedTasks };
+}
 
   return (
     <View style={[styles.screen, { backgroundColor: currentTheme.background, paddingBottom: insets.bottom + 12 }]}>
@@ -96,31 +107,33 @@ export default function ProjectsScreen() {
       {/* Project List */}
       <FlatList
         data={projects}
-        keyExtractor={(p) => p.id}
+        keyExtractor={(p) => p._id}
         contentContainerStyle={{ padding: 12 }}
         renderItem={({ item }) => (
           <TouchableOpacity
-            onPress={() => router.push(`/(routes)/projects/${item.id}`)}
+            onPress={() => router.push(`/(routes)/projects/${item._id}`)}
             style={[styles.card, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}
           >
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <Text style={[styles.projectTitle, { color: currentTheme.cardForeground }]}>{item.title}</Text>
+                <Text style={[styles.projectTitle, { color: currentTheme.cardForeground }]}>{item.name}</Text>
                 <View style={[styles.colorDot, { backgroundColor: item.color }]} />
               </View>
 
               <View style={{ marginTop: 8 }}>
                 <View style={[styles.progressBar, { backgroundColor: currentTheme.background || "#E5E7EB" }]}>
-                  <View style={[styles.progressFill, { width: `${Math.round(item.progress * 100)}%`, backgroundColor: item.color }]} />
+                  <View style={[styles.progressFill, { width: `${calculateProjectProgress(item).progress}%`, backgroundColor: item.color }]} />
                 </View>
                 <Text style={{ color: currentTheme.mutedForeground, marginTop: 6 }}>
-                  {Math.round(item.progress * 100)}% complete
+                  {calculateProjectProgress(item).progress}% complete
                 </Text>
               </View>
 
-              <View style={{ flexDirection: "row", marginTop: 12 }}>
-                {item.members.map((m) => (
-                  <Image key={m.id} source={{ uri: m.avatar }} style={styles.avatar} />
+              <View style={{ flexDirection: "row", marginTop: 12 , gap:4}}>
+                {item.members.slice(0.4
+                  
+                ).map((m) => (
+                  <Avatar user={m}/>
                 ))}
               </View>
             </View>

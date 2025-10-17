@@ -18,7 +18,7 @@ import { ThemeProviderCustom, useThemeToggle } from "@/context/ThemeContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/RouteGuard";
 import RouteGuard from "@/components/RouteGuard";
-import {  ToastProvider } from "@/components/Toast";
+import { ToastProvider } from "@/components/Toast";
 import { Provider } from "react-redux";
 import { store } from "@/store/store";
 
@@ -52,19 +52,19 @@ function mapToNavigationTheme(custom: any): NativeStackSafeTheme {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <Provider store={store}>
-      <ThemeProviderCustom>
-        <SafeAreaProvider>
-          <RouteGuard>
-            <ToastProvider>
-            <InnerLayout />
-            </ToastProvider>
-          </RouteGuard>
-        </SafeAreaProvider>
-      </ThemeProviderCustom>
-      </Provider>
-    </AuthProvider>
+    <Provider store={store}>
+      <AuthProvider>
+        <ThemeProviderCustom>
+          <SafeAreaProvider>
+            <RouteGuard>
+              <ToastProvider>
+                <InnerLayout />
+              </ToastProvider>
+            </RouteGuard>
+          </SafeAreaProvider>
+        </ThemeProviderCustom>
+      </AuthProvider>
+    </Provider>
   );
 }
 

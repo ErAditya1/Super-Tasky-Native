@@ -1,18 +1,19 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { UserInterface } from "../user/userSlice";
+import { User, UserInterface } from "../user/userSlice";
 
 
 export interface ProjectInterface {
     _id: string,
     name: string,
     team: string,
+    color: string,
     description: string,
     owner: string,
     tasks: {
         _id: string,
         title: string
     }[]
-    members: UserInterface[],
+    members: User[],
     isArchieved: boolean
 
 }
@@ -25,6 +26,7 @@ const project: ProjectInterface | null = {
     name: '',
     description: '',
     owner: '',
+    color:"",
     team: '',
     tasks: [],
     members: [],
