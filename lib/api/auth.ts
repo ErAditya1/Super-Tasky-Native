@@ -19,9 +19,9 @@ export const googleLogin = async () => {
   });
   try {
     const base =
-      process.env.NODE_ENV !== "production"
+      process.env.NODE_ENV === "production"
         ? process.env.SERVER_URI || "https://super-tasky-server.onrender.com"
-        : "http://localhost:8000";
+        : "https://super-tasky-server.onrender.com";
 
     const authUrl = `${base}/api/v1/auth/google?mobileRedirect=${encodeURIComponent(redirectUri)}`;
 

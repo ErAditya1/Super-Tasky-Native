@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 import { getCurrentUser } from "@/lib/api/user";
 import { useAppDispatch } from "@/store/hooks";
 import { loginUser } from "@/store/user/userSlice";
+import { getTokens } from "@/lib/api";
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -19,7 +20,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [loading, setGlobalLoading] = useState(true);
+  const [loading, setGlobalLoading] = useState(false);
   const dispatch = useAppDispatch()
 
   const refreshUser = async () => {
@@ -45,7 +46,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    refreshUser();
+     getTokens().then((t)=>{
+          console.log(t.accessToken, t.refreshToken)
+          if(t.accessToken || t.refreshToken) {
+            refreshUser();
+          }
+        })
+   
   }, []);
 
   return (

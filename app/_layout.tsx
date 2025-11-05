@@ -1,5 +1,5 @@
 // app/_layout.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import {
   DarkTheme as NavigationDark,
   DefaultTheme as NavigationDefault,
@@ -21,6 +21,16 @@ import RouteGuard from "@/components/RouteGuard";
 import { ToastProvider } from "@/components/Toast";
 import { Provider } from "react-redux";
 import { store } from "@/store/store";
+import { SocketProvider } from "@/context/SocketProvider";
+import * as Notifications from "expo-notifications";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
+import { LogBox } from "react-native";
+import NotificationCenter from "@/components/NotificationCenter";
+
+LogBox.ignoreAllLogs(true); // optional for dev
+
+// const Stack = createNativeStackNavigator();
 
 type NativeStackSafeTheme = NavigationTheme & {
   fonts: {
@@ -51,18 +61,32 @@ function mapToNavigationTheme(custom: any): NativeStackSafeTheme {
 }
 
 export default function RootLayout() {
+
+ useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      // This runs when user taps a notification
+      console.log("Notification response received (App.tsx):", response);
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, []);
+
   return (
     <Provider store={store}>
       <AuthProvider>
-        <ThemeProviderCustom>
-          <SafeAreaProvider>
-            <RouteGuard>
-              <ToastProvider>
-                <InnerLayout />
-              </ToastProvider>
-            </RouteGuard>
-          </SafeAreaProvider>
-        </ThemeProviderCustom>
+        <SocketProvider>
+          <ThemeProviderCustom>
+            <SafeAreaProvider>
+              <RouteGuard>
+                <ToastProvider>
+                  <InnerLayout />
+                </ToastProvider>
+              </RouteGuard>
+            </SafeAreaProvider>
+          </ThemeProviderCustom>
+        </SocketProvider>
       </AuthProvider>
     </Provider>
   );
@@ -100,6 +124,7 @@ function InnerLayout() {
 
           {/* Protected Routes */}
 
+          <Stack.Screen name="notification-center" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 

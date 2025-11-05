@@ -39,6 +39,7 @@ export interface TaskInterface {
     points: string,
     type: "Task" | "Feature" | "Improvement" | "Research" | "Testing" | "Bug";
     lastSeen:string,
+    isFavourite:boolean
     project: {
         _id:string
         name:string
@@ -86,6 +87,7 @@ const task: TaskInterface | null = {
     points: '',
     type: 'Task',
     lastSeen :"",
+    isFavourite:false,
     project: {
         _id:"",
         name:"",
@@ -149,6 +151,7 @@ const taskSlice = createSlice({
             if (taskIndex !== -1) {
                 state.tasks[taskIndex] = { ...state.tasks[taskIndex], ...updatedTask };
             }
+            
         },
         deleteTask(state, action) {
             const taskId = action.payload;
@@ -182,6 +185,6 @@ const taskSlice = createSlice({
     }
 });
 
-export const { addTasks, clearTasks, addCurrentTask, clearCurrentTask, updateTask, deleteTask, groupTasksByStatus, addStatusGroupedTasks, addFavouriteTasks, insertFavouriteTask} = taskSlice.actions;
+export const { addTasks, clearTasks,insertTask, addCurrentTask, clearCurrentTask, updateTask, deleteTask, groupTasksByStatus, addStatusGroupedTasks, addFavouriteTasks, insertFavouriteTask} = taskSlice.actions;
 
 export default taskSlice.reducer;

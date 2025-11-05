@@ -1,5 +1,6 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { User, UserInterface } from "../user/userSlice";
+import { User } from "../user/userSlice";
+import { TaskInterface } from "../task/taskSlice";
 
 
 export interface ProjectInterface {
@@ -9,10 +10,7 @@ export interface ProjectInterface {
     color: string,
     description: string,
     owner: string,
-    tasks: {
-        _id: string,
-        title: string
-    }[]
+    tasks: TaskInterface[]
     members: User[],
     isArchieved: boolean
 
@@ -64,7 +62,7 @@ const projectSlice = createSlice({
             state.currentProject = project
         },
         insertProject(state, action) {
-            state.projects = [...state.projects, { ...action.payload }]
+            state.projects = [ { ...action.payload }, ...state.projects]
         },
         insertTaskInsideProject(state, action) {
             if (action.payload.project) {
@@ -78,10 +76,13 @@ const projectSlice = createSlice({
                     return p;
                 });
             }
+        },
+        updateProject(state, action){
+            state.projects = action.payload
         }
     },
 });
 
-export const { addProjects, addCurrentProject, clearCurrentProject, clearProjects, insertProject, insertTaskInsideProject } = projectSlice.actions;
+export const { addProjects, addCurrentProject, clearCurrentProject, clearProjects, insertProject, insertTaskInsideProject , updateProject} = projectSlice.actions;
 
 export default projectSlice.reducer;

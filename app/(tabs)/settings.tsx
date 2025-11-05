@@ -19,6 +19,9 @@ import { theme } from "@/constants/Colors";
 import { useThemeToggle } from "@/context/ThemeContext";
 import { logout } from "@/lib/api/auth";
 import { clearAllAuthData } from "@/lib/api";
+import Avatar from "@/components/Avatar";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { logoutUser } from "@/store/user/userSlice";
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -28,6 +31,8 @@ interface SettingsScreenProps {
 function SettingsContent({ onBack, isDark, onToggleTheme }: SettingsScreenProps) {
   const insets = useSafeAreaInsets();
   const {isLoggedIn, setIsLoggedIn} = useAuth()
+  const dispatch = useAppDispatch()
+  const {user} = useAppSelector(s=>s.auth)
   const router = useRouter();
   const currentTheme = theme[isDark ? "dark" : "light"];
 
@@ -38,10 +43,12 @@ function SettingsContent({ onBack, isDark, onToggleTheme }: SettingsScreenProps)
         // Implement sign-out logic here
 
         const res =await logout()
+        console.log(res)
         if(res.success){
             setIsLoggedIn(false);
-            router.replace("/(auth)/Login");
+            dispatch(logoutUser())
             await clearAllAuthData()
+            router.push("/(auth)/Login");
         }
 
 
@@ -88,10 +95,11 @@ function SettingsContent({ onBack, isDark, onToggleTheme }: SettingsScreenProps)
           style={styles.profileCard}
         >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Image source={{ uri: "https://i.pravatar.cc/100" }} style={styles.avatar} />
+            <Avatar user= {user} style={styles.avatar} />
             <View style={{ marginLeft: 12 }}>
-              <Text style={styles.profileName}>John Doe</Text>
-              <Text style={styles.profileEmail}>john.doe@example.com</Text>
+              <Text style={styles.profileName}>{user?.name}</Text>
+              <Text style={styles.profileName}>@{user?.username}</Text>
+              <Text style={styles.profileEmail}>{user?.email}</Text>
             </View>
           </View>
 

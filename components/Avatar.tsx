@@ -1,55 +1,75 @@
-import { View, Text, StyleSheet } from "react-native";
 import React from "react";
+import { View, Text, StyleSheet, ViewStyle } from "react-native";
 import { Image } from "expo-image";
 import { theme } from "@/constants/Colors";
 import { useThemeToggle } from "@/context/ThemeContext";
 
-const Avatar = ({user}:any) => {
-    const {isDark} =useThemeToggle()
-    const currentTheme = theme[isDark ? "dark" : "light"];
+const getInitials = (name?: string) => {
+  if (!name || typeof name !== "string") return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  const first = parts[0]?.[0] ?? "";
+  const second = parts[1]?.[0] ?? "";
+  return (first + second).toUpperCase();
+};
+
+const Avatar: React.FC<any> = ({ user, style = {}, size = 36 }) => {
+  const { isDark } = useThemeToggle();
+  const currentTheme = theme[isDark ? "dark" : "light"];
+
+  const width = size;
+  const height = size;
+  const borderRadius = size / 2;
+
+  const baseImageStyle = { width, height, borderRadius };
+  const baseFallbackStyle = {
+    width,
+    height,
+    borderRadius,
+    alignItems: "center",
+    justifyContent: "center",
+  };
+
   return (
-    <View>
-      {user?.avatar?.url ? (
+    <View style={[styles.container, { width, height }, typeof style === "object" ? style : {}]}>
+      {user && user?.avatar && user?.avatar?.url ? (
         <>
           <Image
-            source={{ uri: user?.avatar?.url }}
-            style={{ width: 35, height: 35, borderRadius: 35 / 2 }}
+            source={{ uri: user.avatar.url }}
+            style={[baseImageStyle, style]}
+            contentFit="cover"
           />
-
           {user?.isOnline && (
             <View
               style={[
                 styles.onlineDot,
-                { backgroundColor: currentTheme.success },
+                {
+                  backgroundColor: currentTheme.success,
+                  borderColor: currentTheme.cardForeground ?? "#fff",
+                },
               ]}
             />
           )}
         </>
       ) : (
-        <View
-          style={[
-            styles.profileAvatar,
-            { backgroundColor: currentTheme.sidebarPrimary },
-          ]}
-        >
-          <Text
-            style={{
-              color: currentTheme.sidebarPrimaryForeground,
-              fontWeight: "700",
-            }}
-          >
-            {user?.name?.split(" ")[0][0]}
-            {user?.name?.split(" ")[1][0]}
-          </Text>
+        <>
+          <View style={[baseFallbackStyle, { backgroundColor: currentTheme.sidebarPrimary }, style]}>
+            <Text style={{ color: currentTheme.sidebarPrimaryForeground, fontWeight: "700" }}>
+              {getInitials(user?.name)}
+            </Text>
+          </View>
           {user?.isOnline && (
             <View
               style={[
                 styles.onlineDot,
-                { backgroundColor: currentTheme.success },
+                {
+                  backgroundColor: currentTheme.success,
+                  borderColor: currentTheme.cardForeground ?? "#fff",
+                },
               ]}
             />
           )}
-        </View>
+        </>
       )}
     </View>
   );
@@ -57,23 +77,19 @@ const Avatar = ({user}:any) => {
 
 export default Avatar;
 
-
 const styles = StyleSheet.create({
-    onlineDot: {
-    position: "absolute",
-    bottom: 4,
-    right: 4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: "#fff",
-  },
-   profileAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  container: {
+    position: "relative", // important for online dot placement
     alignItems: "center",
     justifyContent: "center",
   },
-})
+  onlineDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 10 / 2,
+    borderWidth: 1.5,
+  },
+});

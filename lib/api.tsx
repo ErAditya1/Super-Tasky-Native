@@ -10,7 +10,7 @@ const PROD_URL = "https://super-tasky-server.onrender.com";
 
 
 export const API_URL =
-  process.env.NODE_ENV !== "production" ? PROD_URL : 'http://localhost:8000';
+  process.env.NODE_ENV === "production" ? PROD_URL : 'https://super-tasky-server.onrender.com';
   console.log(API_URL)
 
 // --------- Secure storage keys & utilities ----------

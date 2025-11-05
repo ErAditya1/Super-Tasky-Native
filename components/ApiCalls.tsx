@@ -1,7 +1,7 @@
 "use client";
 
 import { getCurrentTeam, getInvites, getTeams } from "@/lib/api/team";
-import { addInvites, addTeamData, addTeams } from "@/store/team/teamSlice";
+import { addActiveTeam, addInvites, addTeamData, addTeams } from "@/store/team/teamSlice";
 import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "@/store/hooks";
@@ -22,9 +22,10 @@ import { addProjects, clearProjects } from "@/store/project2/projectSlice";
 // import { addProjects, clearProjects } from "@/store/project/projectSlice";
 
 function ApiCalls() {
-  const { activeTeam } = useAppSelector((state) => state.team);
+  const { activeTeam, team } = useAppSelector((state) => state.team);
   const dispatch = useDispatch();
   const { show } = useToast();
+  const {isLoggedIn} = useAppSelector((s)=> s.auth)
 
   const fetchTeamData = async () => {
     const res = await getCurrentTeam();
@@ -33,6 +34,7 @@ function ApiCalls() {
       // setMembers(res.data.data.members);
       const data = res.data.data;
       dispatch(addTeamData(data));
+      // dispatch(addActiveTeam(data));
     } else {
       console.error("Failed to fetch members:", res?.message);
       show(res.message || "Team fetch failed", "danger");
@@ -100,11 +102,14 @@ function ApiCalls() {
       // console.log(res.data.data);
       dispatch(addTasks(res.data.data));
     } else {
+      dispatch(clearTasks());
       console.log("task cleared");
     }
   };
 
   useEffect(() => {
+    console.log("refetched data",isLoggedIn)
+    if(!isLoggedIn) return
     getTasksHandler();
     loadProjects();
     fetchInvites();
@@ -112,7 +117,7 @@ function ApiCalls() {
     getTasksByStatus();
     getFavourite();
     fetchTeams();
-  }, [activeTeam]);
+  }, [activeTeam, isLoggedIn]);
 
   return <></>;
 }

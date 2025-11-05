@@ -20,6 +20,8 @@ import { useAuth } from "@/context/AuthContext";
 import { googleLogin, login } from "@/lib/api/auth";
 import { useForm, Controller } from "react-hook-form";
 import { KEY_ACCESS, KEY_DEVICE, KEY_REFRESH, setTokens } from "@/lib/api";
+import { useAppDispatch } from "@/store/hooks";
+import { loginUser } from "@/store/user/userSlice";
 
 const { width } = Dimensions.get("window");
 
@@ -34,6 +36,7 @@ export default function LoginScreen() {
   const currentTheme = theme[isDark ? "dark" : "light"];
   const { setIsLoggedIn } = useAuth();
   const [loading, setLoading] = useState(false);
+  const dispatch = useAppDispatch()
 
   // Animated logo
   const logoScale = useRef(new Animated.Value(0.8)).current;
@@ -74,10 +77,14 @@ export default function LoginScreen() {
         const refreshToken = res.data.data.refreshToken;
         const deviceId = res.data.data.user?.deviceId || "";
 
+        dispatch(loginUser(res.data.data.user));
+               
+
         await setTokens(KEY_ACCESS, accessToken);
         await setTokens(KEY_REFRESH, refreshToken);
         if (deviceId) await setTokens(KEY_DEVICE, deviceId);
         setIsLoggedIn(true);
+
       } else {
         Alert.alert("Login Failed", res.message || "Invalid credentials");
       }
